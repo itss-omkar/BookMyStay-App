@@ -1,96 +1,71 @@
-import java.util.*;
+import java.util.Scanner;
 
 /**
  * =========================================================
  * MAIN CLASS - BookMyStayApp
  * =========================================================
  *
- * Use Case 8: Booking History & Reporting
+ * Use Case 9: Error Handling & Validation
  *
- * @version 8.1
+ * @version 9.1
  */
 public class BookMyStayApp {
 
     public static void main(String[] args) {
 
-        System.out.println("Booking History and Reporting\n");
+        Scanner sc = new Scanner(System.in);
 
-        // Initialize booking history
-        BookingHistory history = new BookingHistory();
+        System.out.println("Booking Validation");
 
-        // Simulate confirmed bookings
-        history.addReservation(new Reservation("Abhi", "Single"));
-        history.addReservation(new Reservation("Subha", "Double"));
-        history.addReservation(new Reservation("Vanmathi", "Suite"));
+        try {
+            // Input
+            System.out.print("Enter guest name: ");
+            String name = sc.nextLine();
 
-        // Generate report
-        BookingReportService reportService = new BookingReportService();
-        reportService.generateReport(history);
-    }
-}
+            System.out.print("Enter room type (Single/Double/Suite): ");
+            String roomType = sc.nextLine();
 
-/**
- * =========================================================
- * CLASS - Reservation
- * =========================================================
- */
-class Reservation {
+            // Validate
+            BookingValidator.validateRoomType(roomType);
 
-    private String guestName;
-    private String roomType;
+            // If valid
+            System.out.println("Booking successful for " + name + " (" + roomType + ")");
 
-    public Reservation(String guestName, String roomType) {
-        this.guestName = guestName;
-        this.roomType = roomType;
-    }
-
-    public String getGuestName() {
-        return guestName;
-    }
-
-    public String getRoomType() {
-        return roomType;
-    }
-}
-
-/**
- * =========================================================
- * CLASS - BookingHistory
- * =========================================================
- */
-class BookingHistory {
-
-    // List to store confirmed bookings
-    private List<Reservation> reservations = new ArrayList<>();
-
-    // Add reservation to history
-    public void addReservation(Reservation r) {
-        reservations.add(r);
-    }
-
-    // Retrieve all reservations
-    public List<Reservation> getReservations() {
-        return reservations;
-    }
-}
-
-/**
- * =========================================================
- * CLASS - BookingReportService
- * =========================================================
- */
-class BookingReportService {
-
-    // Generate booking report
-    public void generateReport(BookingHistory history) {
-
-        System.out.println("Booking History Report\n");
-
-        for (Reservation r : history.getReservations()) {
-            System.out.println("Guest: "
-                    + r.getGuestName()
-                    + ", Room Type: "
-                    + r.getRoomType());
+        } catch (InvalidBookingException e) {
+            System.out.println("Booking failed: " + e.getMessage());
         }
+
+        sc.close();
+    }
+}
+
+/**
+ * =========================================================
+ * CLASS - BookingValidator
+ * =========================================================
+ */
+class BookingValidator {
+
+    public static void validateRoomType(String roomType) throws InvalidBookingException {
+
+        // Case-sensitive validation (as mentioned)
+        if (!(roomType.equals("Single") ||
+                roomType.equals("Double") ||
+                roomType.equals("Suite"))) {
+
+            throw new InvalidBookingException("Invalid room type selected.");
+        }
+    }
+}
+
+/**
+ * =========================================================
+ * CLASS - InvalidBookingException
+ * =========================================================
+ */
+class InvalidBookingException extends Exception {
+
+    public InvalidBookingException(String message) {
+        super(message);
     }
 }
