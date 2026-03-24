@@ -1,3 +1,4 @@
+import java.io.*;
 import java.util.*;
 
 /**
@@ -5,116 +6,83 @@ import java.util.*;
  * MAIN CLASS - BookMyStayApp
  * =========================================================
  *
- * Use Case 11: Concurrent Booking Simulation
+ * Use Case 12: Data Persistence & System Recovery
  *
- * @version 11.1
+ * @version 12.1
  */
 public class BookMyStayApp {
 
     public static void main(String[] args) {
 
-        System.out.println("Concurrent Booking Simulation\n");
+        System.out.println("System Recovery\n");
 
-        // Shared inventory
-        RoomInventory inventory = new RoomInventory();
+        PersistenceService persistence = new PersistenceService();
 
-        // Shared allocation service
-        RoomAllocationService service = new RoomAllocationService(inventory);
+        // Try to load inventory
+        Map<String, Integer> inventory = persistence.loadInventory();
 
-        // Simulate multiple users (threads)
-        Thread t1 = new Thread(() -> service.bookRoom("Abhi", "Single"));
-        Thread t2 = new Thread(() -> service.bookRoom("Vanmathi", "Double"));
-        Thread t3 = new Thread(() -> service.bookRoom("Kural", "Suite"));
-        Thread t4 = new Thread(() -> service.bookRoom("Subha", "Single"));
+        if (inventory == null) {
+            System.out.println("No valid inventory data found. Starting fresh.\n");
 
-        // Start threads (concurrent execution)
-        t1.start();
-        t2.start();
-        t3.start();
-        t4.start();
-
-        // Wait for all threads to finish
-        try {
-            t1.join();
-            t2.join();
-            t3.join();
-            t4.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+            // Default inventory
+            inventory = new HashMap<>();
+            inventory.put("Single", 5);
+            inventory.put("Double", 3);
+            inventory.put("Suite", 2);
         }
 
-        // Display remaining inventory
-        System.out.println("\nRemaining Inventory:");
-        inventory.displayInventory();
+        // Display inventory
+        System.out.println("Current Inventory:");
+        for (String key : inventory.keySet()) {
+            System.out.println(key + ": " + inventory.get(key));
+        }
+
+        // Save inventory
+        persistence.saveInventory(inventory);
+
+        System.out.println("Inventory saved successfully.");
     }
 }
 
 /**
  * =========================================================
- * CLASS - RoomInventory
+ * CLASS - PersistenceService
  * =========================================================
  */
-class RoomInventory {
+class PersistenceService {
 
-    private Map<String, Integer> availability = new HashMap<>();
+    private static final String FILE_NAME = "inventory.dat";
 
-    public RoomInventory() {
-        availability.put("Single", 5);
-        availability.put("Double", 3);
-        availability.put("Suite", 2);
-    }
+    // Save inventory to file
+    public void saveInventory(Map<String, Integer> inventory) {
+        try (ObjectOutputStream oos =
+                     new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
 
-    public int getAvailable(String type) {
-        return availability.getOrDefault(type, 0);
-    }
+            oos.writeObject(inventory);
 
-    public void reduce(String type) {
-        availability.put(type, availability.get(type) - 1);
-    }
-
-    public void displayInventory() {
-        for (String key : availability.keySet()) {
-            System.out.println(key + ": " + availability.get(key));
+        } catch (IOException e) {
+            System.out.println("Error saving inventory: " + e.getMessage());
         }
     }
-}
 
-/**
- * =========================================================
- * CLASS - RoomAllocationService (Thread Safe)
- * =========================================================
- */
-class RoomAllocationService {
+    // Load inventory from file
+    public Map<String, Integer> loadInventory() {
 
-    private RoomInventory inventory;
+        File file = new File(FILE_NAME);
 
-    // Track room IDs
-    private Map<String, Integer> counters = new HashMap<>();
-
-    public RoomAllocationService(RoomInventory inventory) {
-        this.inventory = inventory;
-    }
-
-    // Critical section (synchronized)
-    public synchronized void bookRoom(String guest, String type) {
-
-        // Check availability
-        if (inventory.getAvailable(type) <= 0) {
-            System.out.println("No rooms available for " + guest);
-            return;
+        // If file doesn't exist
+        if (!file.exists()) {
+            return null;
         }
 
-        // Generate room ID
-        int count = counters.getOrDefault(type, 0) + 1;
-        counters.put(type, count);
+        try (ObjectInputStream ois =
+                     new ObjectInputStream(new FileInputStream(FILE_NAME))) {
 
-        String roomId = type + "-" + count;
+            return (Map<String, Integer>) ois.readObject();
 
-        // Reduce inventory
-        inventory.reduce(type);
-
-        // Confirm booking
-        System.out.println("Booking confirmed for Guest: "
-                + guest + ", Room ID: " + roomId);
+        } catch (Exception e) {
+            System.out.println("Error loading inventory. Starting fresh.");
+            return null;
+        }
     }
 }
