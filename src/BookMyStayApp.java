@@ -5,31 +5,47 @@ import java.util.*;
  * MAIN CLASS - BookMyStayApp
  * =========================================================
  *
- * Use Case 10: Booking Cancellation & Inventory Rollback
+ * Use Case 11: Concurrent Booking Simulation
  *
- * @version 10.1
+ * @version 11.1
  */
 public class BookMyStayApp {
 
     public static void main(String[] args) {
 
-        System.out.println("Booking Cancellation\n");
+        System.out.println("Concurrent Booking Simulation\n");
 
-        // Initialize inventory
+        // Shared inventory
         RoomInventory inventory = new RoomInventory();
 
-        // Simulate allocated booking
-        String reservationId = "Single-1";
-        String roomType = "Single";
+        // Shared allocation service
+        RoomAllocationService service = new RoomAllocationService(inventory);
 
-        // Reduce inventory as if booked earlier
-        inventory.reduceAvailability(roomType);
+        // Simulate multiple users (threads)
+        Thread t1 = new Thread(() -> service.bookRoom("Abhi", "Single"));
+        Thread t2 = new Thread(() -> service.bookRoom("Vanmathi", "Double"));
+        Thread t3 = new Thread(() -> service.bookRoom("Kural", "Suite"));
+        Thread t4 = new Thread(() -> service.bookRoom("Subha", "Single"));
 
-        // Initialize cancellation service
-        CancellationService cancelService = new CancellationService(inventory);
+        // Start threads (concurrent execution)
+        t1.start();
+        t2.start();
+        t3.start();
+        t4.start();
 
-        // Perform cancellation
-        cancelService.cancelBooking(reservationId, roomType);
+        // Wait for all threads to finish
+        try {
+            t1.join();
+            t2.join();
+            t3.join();
+            t4.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // Display remaining inventory
+        System.out.println("\nRemaining Inventory:");
+        inventory.displayInventory();
     }
 }
 
@@ -48,68 +64,57 @@ class RoomInventory {
         availability.put("Suite", 2);
     }
 
-    public void reduceAvailability(String type) {
+    public int getAvailable(String type) {
+        return availability.getOrDefault(type, 0);
+    }
+
+    public void reduce(String type) {
         availability.put(type, availability.get(type) - 1);
     }
 
-    public void increaseAvailability(String type) {
-        availability.put(type, availability.get(type) + 1);
-    }
-
-    public int getAvailability(String type) {
-        return availability.get(type);
+    public void displayInventory() {
+        for (String key : availability.keySet()) {
+            System.out.println(key + ": " + availability.get(key));
+        }
     }
 }
 
 /**
  * =========================================================
- * CLASS - CancellationService
+ * CLASS - RoomAllocationService (Thread Safe)
  * =========================================================
  */
-class CancellationService {
+class RoomAllocationService {
 
     private RoomInventory inventory;
 
-    // Stack for rollback (LIFO)
-    private Stack<String> rollbackStack = new Stack<>();
+    // Track room IDs
+    private Map<String, Integer> counters = new HashMap<>();
 
-    // Track active reservations
-    private Set<String> activeReservations = new HashSet<>();
-
-    public CancellationService(RoomInventory inventory) {
+    public RoomAllocationService(RoomInventory inventory) {
         this.inventory = inventory;
-
-        // Simulating existing reservation
-        activeReservations.add("Single-1");
     }
 
-    public void cancelBooking(String reservationId, String roomType) {
+    // Critical section (synchronized)
+    public synchronized void bookRoom(String guest, String type) {
 
-        // Validate reservation
-        if (!activeReservations.contains(reservationId)) {
-            System.out.println("Cancellation failed: Reservation not found.");
+        // Check availability
+        if (inventory.getAvailable(type) <= 0) {
+            System.out.println("No rooms available for " + guest);
             return;
         }
 
-        // Push to rollback stack
-        rollbackStack.push(reservationId);
+        // Generate room ID
+        int count = counters.getOrDefault(type, 0) + 1;
+        counters.put(type, count);
 
-        // Remove from active reservations
-        activeReservations.remove(reservationId);
+        String roomId = type + "-" + count;
 
-        // Restore inventory
-        inventory.increaseAvailability(roomType);
+        // Reduce inventory
+        inventory.reduce(type);
 
-        // Output
-        System.out.println("Booking cancelled successfully. Inventory restored for room type: " + roomType);
-
-        // Show rollback history
-        System.out.println("\nRollback History (Most Recent First):");
-        for (int i = rollbackStack.size() - 1; i >= 0; i--) {
-            System.out.println("Released Reservation ID: " + rollbackStack.get(i));
-        }
-
-        // Show updated inventory
-        System.out.println("\nUpdated " + roomType + " Room Availability: " + inventory.getAvailability(roomType));
+        // Confirm booking
+        System.out.println("Booking confirmed for Guest: "
+                + guest + ", Room ID: " + roomId);
     }
 }
